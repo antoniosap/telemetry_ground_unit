@@ -13,7 +13,7 @@ PIN 06  SDO     <-- D11 MOSI
 PIN 07  SDI     <-- D12 MISO
 PIN 08  SCLK    <-- D13 SCK
 PIN 09  NSEL    <-- D10 CS
-PIN 10  NIRQ    <-- D2
+PIN 10  NIRQ    <-- D15
 PIN 11  SDN     <-- D5
 PIN 12
 ...
@@ -31,16 +31,16 @@ D13 SCK --> SLCK radio
 D12 MISO -> SDI radio
 D11 MOSI <- SDO radio
 D10 CS  --> NSEL radio
-D2      --> NIRQ
+D15     --> NIRQ
 D5      --> SDN
 
 INGRESSI DIGITAL:
-D3  <-- RB = HOME POSITION - FRONT VIEV
-D4  <-- LB = COMMAND BY POTS
+D2  <-- RED BTN = HOME POSITION - FRONT VIEV
+D4  <-- BLACK BTN = COMMAND BY POTS
 
 INGRESSI ANALOGICI 0->3V3:
 A0  <-- RP = PAN
-A1  <-- LP = TILT
+A3  <-- LP = TILT
 
 ## interfaces
 
