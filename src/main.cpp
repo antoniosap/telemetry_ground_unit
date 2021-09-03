@@ -30,6 +30,8 @@
 #define PR(msg, value)          {}           
 #endif
 
+#define PR_VALUE(msg, value)    { Serial.print(F(msg)); Serial.println(value); }
+
 /*
  * Uncomment to enable debug output.
  * Warning: Debug output will slow down the whole system significantly.
@@ -49,8 +51,20 @@
 #define ADC1_0                  (36)
 #define ADC1_3                  (39)
 
+//------------------------------------------------------------------------------
+template <typename T> T serialPrintBinary(T x, bool usePrefix = true)
+{
+  if (usePrefix) Serial.print("0b");
+  for (uint8_t i = 0; i < 8 * sizeof(x); i++) {
+    Serial.print(bitRead(x, sizeof(x) * 8 - i - 1));
+  }
+  Serial.println();
+  return x;
+}
+
 //-- 433 MHz RADIO --------------------------------------------------------------
 #include <RadioLib.h>
+#include <RadioDefs.h>
 
 // https://www.electrodragon.com/w/Si4432
 // Si4432 has the following connections:
@@ -59,7 +73,15 @@
 // BUG: https://github.com/jgromes/RadioLib/issues/305
 #define RADIO_SDN       13
 
-Si4432 radio = new Module(RADIO_nSEL, RADIO_nIRQ, RADIO_SDN);
+Module* module = new Module(RADIO_nSEL, RADIO_nIRQ, RADIO_SDN);
+Si4432 radio = module;
+
+float radioFreq = 434.0;
+float radioBitRateKbSec = 48.0;
+float radioFreqDev = 50.0;
+float radioRxBw = 181.1;
+int8_t radioPower = 10;
+uint8_t radioPreambleLen = 40; 
 
 //-- MSG PACK -------------------------------------------------------------------
 // RX PROTOCOL
@@ -95,16 +117,34 @@ result menuSetUser();
 result menuSetPass();
 result menuSave();
 result menuInfo();
+result menuSetChannel();
+result menuSetPower();
+result menuLoopbackTest();
+result menuRadioStatus();
+result menuDumpRadioRegisters();
 
-MENU(mainMenu,"telemetry config",doNothing,noEvent,wrapStyle
+MENU(wifiMenu,"wifi",doNothing,noEvent,wrapStyle
   ,OP("show IP",menuShowIP,enterEvent)
   ,OP("list AP",menuListAP,enterEvent)
   ,OP("set user",menuSetUser,enterEvent)
   ,OP("set password",menuSetPass,enterEvent)
   ,OP("save",menuSave,enterEvent)
+  ,EXIT("<Back")
+);
+
+MENU(radioMenu,"radio",doNothing,noEvent,wrapStyle
+  ,OP("set channel",menuSetChannel,enterEvent)
+  ,OP("set power",menuSetPower,enterEvent)
+  ,EXIT("<Back")
+);
+
+MENU(mainMenu,"system config",doNothing,noEvent,wrapStyle
+  ,SUBMENU(wifiMenu)
+  ,SUBMENU(radioMenu)
   ,OP("nav info",menuInfo,enterEvent)
-  ,OP("set channel",doNothing,enterEvent)
-  ,OP("set power",doNothing,enterEvent)
+  ,OP("loopback test",menuLoopbackTest,enterEvent)
+  ,OP("radio status",menuRadioStatus,enterEvent)
+  ,OP("dump radio registers",menuDumpRadioRegisters,enterEvent)
   ,EXIT("<Back")
 );
 
@@ -193,6 +233,42 @@ result menuInfo() {
   return proceed;
 }
 
+result menuSetChannel() {
+  Serial.println("menuSetChannel");
+  return proceed;
+}
+
+result menuSetPower() {
+  Serial.println("menuSetPower");
+  return proceed;
+}
+
+result menuLoopbackTest() {
+  Serial.println("menuLoopbackTest");
+  return proceed;
+}
+
+result menuRadioStatus() {
+  PR_VALUE("radio freq MHz: ", radioFreq);
+  PR_VALUE("bit rate kb/s: ", radioBitRateKbSec);
+  PR_VALUE("TX power: ", radioPower);
+  PR_VALUE("RSSI:", module->SPIgetRegValue(SI443X_REG_RSSI));
+  PR_VALUE("RSSI THR:", module->SPIgetRegValue(SI443X_REG_RSSI_CLEAR_CHANNEL_THRESHOLD));
+  return proceed;
+}
+
+result menuDumpRadioRegisters() {
+  Serial.println("dump radio registers");
+  for (uint8_t i = 0; i <= 0x7F; i++) {
+    Serial.print("I:REG:");
+    Serial.print(i, HEX);
+    Serial.print(":");
+    serialPrintBinary((uint8_t)module->SPIgetRegValue(i));
+    // Serial.println(module->SPIgetRegValue(i), BIN);
+  }
+  return proceed;
+}
+
 //-------------------------------------------------------------------------------
 void setup() {
   Serial.begin(UART_BAUDRATE);
@@ -208,7 +284,7 @@ void setup() {
   PR("I:MISO:", MISO);
   PR("I:SCK:", SCK);
   PR("I:SS:", SS);
-  int state = radio.begin();
+  int state = radio.begin(radioFreq, radioBitRateKbSec, radioFreqDev, radioRxBw, radioPower, radioPreambleLen);
   if (state == ERR_NONE) {
     Serial.println(F("I:Si4432:success!"));
   } else {
@@ -233,12 +309,13 @@ void loop() {
     unpacker.deserialize(pan, tilt, outd);
 
     // print the data of the packet
-    Serial.print(F("I:Si4432:RX:Data:\t\t"));
+    Serial.print(F("I:Si4432:RX:Data:"));
     Serial.println((char*)payload);
 
   } else if (state == ERR_RX_TIMEOUT) {
     // timeout occurred while waiting for a packet
-    Serial.println(F("I:Si4432:RX:timeout!"));
+    // Serial.println(F("I:Si4432:RX:timeout!"));
+    Serial.print(F("."));
 
   } else if (state == ERR_CRC_MISMATCH) {
     // packet was received, but is malformed
