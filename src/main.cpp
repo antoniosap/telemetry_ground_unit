@@ -4,10 +4,47 @@
 #include <Arduino.h>
 
 //-- DEBUG ----------------------------------------------------------------------
+#define DEBUG_PIN               false
+#define DEBUG_VALUE             false
+
+#if DEBUG_PIN
+#define TEST_PIN(gpio_nr)          { Serial.print("TEST_PIN BEGIN:"); \
+                                     Serial.println(gpio_nr); \
+                                     for (uint8_t i = 0; i < 10; i++) { \
+                                        Serial.println("TEST_PIN RUNNING"); \
+                                        pinMode(gpio_nr, OUTPUT); \
+                                        digitalWrite(gpio_nr, HIGH); \
+                                        delay(1000); \
+                                        digitalWrite(gpio_nr, LOW); \
+                                        delay(1000); \
+                                     } \
+                                     Serial.println("TEST_PIN END"); \
+                                   }
+#else
+#define TEST_PIN(gpio_nr)          {}           
+#endif
+
+#if DEBUG_VALUE
+#define PR(msg, value)          { Serial.print(msg); Serial.println(value); }
+#else
+#define PR(msg, value)          {}           
+#endif
+
+/*
+ * Uncomment to enable debug output.
+ * Warning: Debug output will slow down the whole system significantly.
+ *          Also, it will result in larger compiled binary.
+ * Levels: debug - only main info
+ *         verbose - full transcript of all SPI/UART communication
+ */
+
+#define RADIOLIB_DEBUG
+// #define RADIOLIB_VERBOSE
+
 
 //-- CONFIGURATIONS -------------------------------------------------------------
 #define UART_ECHO               (0)
-#define UART_BAUDRATE           (19400)
+#define UART_BAUDRATE           (115200)
 
 #define ADC1_0                  (36)
 #define ADC1_3                  (39)
@@ -17,9 +54,10 @@
 
 // https://www.electrodragon.com/w/Si4432
 // Si4432 has the following connections:
-#define RADIO_nSEL      10
-#define RADIO_nIRQ      2
-#define RADIO_SDN       5
+#define RADIO_nSEL      5
+#define RADIO_nIRQ      15
+// BUG: https://github.com/jgromes/RadioLib/issues/305
+#define RADIO_SDN       13
 
 Si4432 radio = new Module(RADIO_nSEL, RADIO_nIRQ, RADIO_SDN);
 
@@ -32,6 +70,8 @@ uint8_t outd;   // bit 3 = PIN 3, pin 4 = PIN 4
 // TX PROTOCOL
 float analogPan;
 float analogTilt;
+float analogPanLast;
+float analogTiltLast;
 // #define MSGPACK_DEBUGLOG_ENABLE
 #include <MsgPack.h>
 
@@ -63,6 +103,8 @@ MENU(mainMenu,"telemetry config",doNothing,noEvent,wrapStyle
   ,OP("set password",menuSetPass,enterEvent)
   ,OP("save",menuSave,enterEvent)
   ,OP("nav info",menuInfo,enterEvent)
+  ,OP("set channel",doNothing,enterEvent)
+  ,OP("set power",doNothing,enterEvent)
   ,EXIT("<Back")
 );
 
@@ -91,6 +133,10 @@ float voltageReading(float value) {
 void sensorReading() {
   analogPan = voltageReading(ADC1_0);
   analogTilt = voltageReading(ADC1_3);
+  if (analogPan == analogPanLast && analogTilt == analogTiltLast) return;
+
+  analogPanLast = analogPan;
+  analogTiltLast = analogTilt;
   packer.serialize(analogPan, analogTilt);
   int state = radio.transmit((uint8_t *)packer.data(), packer.size());
 
@@ -153,12 +199,20 @@ void setup() {
   // needed to keep leonardo/micro from starting too fast!
   while (!Serial) { delay(10); }
 
-  Serial.print(F("I:Si4432:START"));
+  TEST_PIN(RADIO_nSEL);
+  TEST_PIN(RADIO_nIRQ);
+  TEST_PIN(RADIO_SDN);
+  TEST_PIN(18);
+  Serial.println(F("I:Si4432:START"));
+  PR("I:MOSI:", MOSI);
+  PR("I:MISO:", MISO);
+  PR("I:SCK:", SCK);
+  PR("I:SS:", SS);
   int state = radio.begin();
   if (state == ERR_NONE) {
     Serial.println(F("I:Si4432:success!"));
   } else {
-    Serial.print(F("I:Si4432:failed, code"));
+    Serial.print(F("I:Si4432:failed code: "));
     Serial.println(state);
     while (true);
   }
@@ -192,7 +246,7 @@ void loop() {
 
   } else {
     // some other error occurred
-    Serial.print(F("I:Si4432:RX:failed, code "));
+    Serial.print(F("I:Si4432:RX:failed code: "));
     Serial.println(state);
 
   }
