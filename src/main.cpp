@@ -85,10 +85,11 @@ uint8_t radioPreambleLen = 40;
 
 //-- MSG PACK -------------------------------------------------------------------
 // RX PROTOCOL
-uint8_t pan;
-uint8_t tilt;
-uint8_t outd;   // bit 3 = PIN 3, pin 4 = PIN 4
-#define PACKET_RX_SIZE (sizeof(uint8_t) * 3)
+float analogA0;
+float analogA1;
+float analogA2;
+float analogA3;
+#define PACKET_RX_SIZE (sizeof(float) * 4)
 // TX PROTOCOL
 float analogPan;
 float analogTilt;
@@ -171,7 +172,11 @@ float voltageReading(float value) {
 void sensorReading() {
   analogPan = voltageReading(ADC1_0);
   analogTilt = voltageReading(ADC1_3);
+  packer.clear();
   packer.serialize(analogPan, analogTilt);
+  PR("\nI:TX:PAN:", analogPan);
+  PR("I:TX:TILT:", analogTilt);
+  PR("I:TX:SIZE:", packer.size());
   int state = radio.transmit((uint8_t *)packer.data(), packer.size());
 
   if (state == ERR_NONE) {
@@ -298,13 +303,17 @@ void loop() {
 
   if (state == ERR_NONE) {
     // packet was successfully received
-    Serial.println(F("I:Si4432:RX:success!"));
+    Serial.println(F("\nI:Si4432:RX:success!"));
     unpacker.feed(payload, PACKET_RX_SIZE);
-    unpacker.deserialize(pan, tilt, outd);
+    unpacker.deserialize(analogA0, analogA1, analogA2, analogA3);
 
     // print the data of the packet
-    Serial.print(F("I:Si4432:RX:Data:"));
-    Serial.println((char*)payload);
+    // Serial.print(F("I:Si4432:RX:Data:"));
+    // Serial.println((char*)payload);
+    PR("I:RX:A0:", analogA0);
+    PR("I:RX:A1:", analogA1);
+    PR("I:RX:A2:", analogA2);
+    PR("I:RX:A3:", analogA3);
 
   } else if (state == ERR_RX_TIMEOUT) {
     // timeout occurred while waiting for a packet
@@ -313,11 +322,11 @@ void loop() {
 
   } else if (state == ERR_CRC_MISMATCH) {
     // packet was received, but is malformed
-    Serial.println(F("I:Si4432:RX:CRC error!"));
+    Serial.println(F("\nI:Si4432:RX:CRC error!"));
 
   } else {
     // some other error occurred
-    Serial.print(F("I:Si4432:RX:failed code: "));
+    Serial.print(F("\nI:Si4432:RX:failed code: "));
     Serial.println(state);
 
   }
