@@ -92,8 +92,6 @@ uint8_t outd;   // bit 3 = PIN 3, pin 4 = PIN 4
 // TX PROTOCOL
 float analogPan;
 float analogTilt;
-float analogPanLast;
-float analogTiltLast;
 // #define MSGPACK_DEBUGLOG_ENABLE
 #include <MsgPack.h>
 
@@ -163,7 +161,7 @@ NAVROOT(nav,mainMenu,MAX_DEPTH,in,out);
 #include <TaskScheduler.h>
 
 void sensorReading();
-Task sensorTask(5000, TASK_FOREVER, &sensorReading);
+Task sensorTask(250, TASK_FOREVER, &sensorReading);
 Scheduler runner;
 
 float voltageReading(float value) {
@@ -173,10 +171,6 @@ float voltageReading(float value) {
 void sensorReading() {
   analogPan = voltageReading(ADC1_0);
   analogTilt = voltageReading(ADC1_3);
-  if (analogPan == analogPanLast && analogTilt == analogTiltLast) return;
-
-  analogPanLast = analogPan;
-  analogTiltLast = analogTilt;
   packer.serialize(analogPan, analogTilt);
   int state = radio.transmit((uint8_t *)packer.data(), packer.size());
 
@@ -227,7 +221,7 @@ result menuSave() {
 }
 
 result menuInfo() {
-  Serial.println("I:CONSOLE");
+  Serial.println("\nI:CONSOLE");
   Serial.println("I:Use keys [+ up] [- down] [* enter] [/ esc]");
   Serial.println("I:to control the menu navigation");
   return proceed;
@@ -249,7 +243,7 @@ result menuLoopbackTest() {
 }
 
 result menuRadioStatus() {
-  PR_VALUE("radio freq MHz: ", radioFreq);
+  PR_VALUE("\nradio freq MHz: ", radioFreq);
   PR_VALUE("bit rate kb/s: ", radioBitRateKbSec);
   PR_VALUE("TX power: ", radioPower);
   PR_VALUE("RSSI:", module->SPIgetRegValue(SI443X_REG_RSSI));
@@ -258,7 +252,7 @@ result menuRadioStatus() {
 }
 
 result menuDumpRadioRegisters() {
-  Serial.println("dump radio registers");
+  Serial.println("\n+dump radio registers");
   for (uint8_t i = 0; i <= 0x7F; i++) {
     Serial.print("I:REG:");
     Serial.print(i, HEX);
