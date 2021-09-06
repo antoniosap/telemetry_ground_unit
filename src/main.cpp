@@ -5,7 +5,7 @@
 
 //-- DEBUG ----------------------------------------------------------------------
 #define DEBUG_PIN               false
-#define DEBUG_VALUE             false
+#define DEBUG_VALUE             true
 
 #if DEBUG_PIN
 #define TEST_PIN(gpio_nr)          { Serial.print("TEST_PIN BEGIN:"); \
@@ -285,10 +285,12 @@ void rxTelemetry() {
     // print the data of the packet
     // Serial.print(F("I:Si4432:RX:Data:"));
     // Serial.println((char*)payload);
-    PR("I:RX:A0:", analogA0);
-    PR("I:RX:A1:", analogA1);
-    PR("I:RX:A2:", analogA2);
-    PR("I:RX:A3:", analogA3);
+#if DEBUG_VALUE
+    PR_FLOAT("I:RX:A0:", analogA0);
+    PR_FLOAT("I:RX:A1:", analogA1);
+    PR_FLOAT("I:RX:A2:", analogA2);
+    PR_FLOAT("I:RX:A3:", analogA3);
+#endif
 
   } else if (state == ERR_RX_TIMEOUT) {
     // timeout occurred while waiting for a packet
