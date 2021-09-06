@@ -31,7 +31,7 @@
 #endif
 
 #define PR_VALUE(msg, value)    { Serial.print(F(msg)); Serial.println(value); }
-#define PR_FLOAT(msg, value)    { char buf[16]; snprintf(buf, 16, "%.3f", value); Serial.print(F(msg)); Serial.println(buf); }
+#define PR_FLOAT(msg, value)    { char buf[16]; snprintf(buf, 16, "%.4f", value); Serial.print(F(msg)); Serial.println(buf); }
 
 /*
  * Uncomment to enable debug output.
@@ -109,7 +109,7 @@ float analogA0;
 float analogA1;
 float analogA2;
 float analogA3;
-#define PACKET_RX_SIZE (sizeof(float) * 4)
+#define PACKET_RX_SIZE (20)    // matched bit-bit @ packer.size() transmitter 
 // TX PROTOCOL
 float txAnalogPan;
 float txAnalogTilt;
@@ -240,8 +240,8 @@ void txSensor() {
   txAnalogTilt = voltageReading12b(ADC1_3);
   packer.clear();
   packer.serialize(txAnalogPan, txAnalogTilt, BTNBlkValue, BTNRedValue);
-  PR("\nI:TX:PAN:", txAnalogPan);
-  PR("I:TX:TILT:", txAnalogTilt);
+  PR_FLOAT("\nI:TX:PAN:", txAnalogPan);
+  PR_FLOAT("I:TX:TILT:", txAnalogTilt);
   PR("I:TX:BLK:", BTNBlkValue);
   PR("I:TX:RED:", BTNRedValue);
   PR("I:TX:SIZE:", packer.size());
@@ -285,12 +285,18 @@ void rxTelemetry() {
     // print the data of the packet
     // Serial.print(F("I:Si4432:RX:Data:"));
     // Serial.println((char*)payload);
+<<<<<<< HEAD
 #if DEBUG_VALUE
+=======
+>>>>>>> 53ae7d247b324a6f1dcad3880a0139a8f76618eb
     PR_FLOAT("I:RX:A0:", analogA0);
     PR_FLOAT("I:RX:A1:", analogA1);
     PR_FLOAT("I:RX:A2:", analogA2);
     PR_FLOAT("I:RX:A3:", analogA3);
+<<<<<<< HEAD
 #endif
+=======
+>>>>>>> 53ae7d247b324a6f1dcad3880a0139a8f76618eb
 
   } else if (state == ERR_RX_TIMEOUT) {
     // timeout occurred while waiting for a packet
