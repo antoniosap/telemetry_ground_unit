@@ -285,19 +285,12 @@ void rxTelemetry() {
     // print the data of the packet
     // Serial.print(F("I:Si4432:RX:Data:"));
     // Serial.println((char*)payload);
-<<<<<<< HEAD
 #if DEBUG_VALUE
-=======
->>>>>>> 53ae7d247b324a6f1dcad3880a0139a8f76618eb
     PR_FLOAT("I:RX:A0:", analogA0);
     PR_FLOAT("I:RX:A1:", analogA1);
     PR_FLOAT("I:RX:A2:", analogA2);
     PR_FLOAT("I:RX:A3:", analogA3);
-<<<<<<< HEAD
 #endif
-=======
->>>>>>> 53ae7d247b324a6f1dcad3880a0139a8f76618eb
-
   } else if (state == ERR_RX_TIMEOUT) {
     // timeout occurred while waiting for a packet
     // LED_SHOW_COLOR(RX_LED, CRGB::Blue);
