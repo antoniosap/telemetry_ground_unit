@@ -39,6 +39,25 @@ INGRESSI ANALOGICI 0->3V3:
 ADC1_0  <-- RP = PAN
 ADC1_3  <-- LP = TILT
 
+USCITE LED BAR RGB WS2812:
+3V3         VIN
+GPIO 33 --> DI
+GND         GND
+
+COLOR CODING:
+NUMBER  FUNCTION            COLOR
+LED 0 RSSI                  0 -> 6
+LED 1 BAT ground base
+LED 2 BAT mobile 1
+LED 3 BAT mobile 2
+LED 4
+LED 5
+LED 6 RX PACKET             GREEN = OK
+LED 7 TX PACKET             GREEN = OK
+
+HUE:
+0 VIOLET #8000ff 1 BLUE #0000ff 2 PINK #ff00ff 3 RED #ff0000 4 ORANGE #ff8000 5 YELLOW #ffff00 6 GREEN #00ff00 
+
 ## interfaces
 
 MQTT messages
