@@ -5,7 +5,7 @@
 
 //-- DEBUG ----------------------------------------------------------------------
 #define DEBUG_PIN               false
-#define DEBUG_VALUE             true
+#define DEBUG_VALUE             false
 
 #if DEBUG_PIN
 #define TEST_PIN(gpio_nr)          { Serial.print("TEST_PIN BEGIN:"); \
@@ -25,9 +25,11 @@
 #endif
 
 #if DEBUG_VALUE
-#define PR(msg, value)          { Serial.print(msg); Serial.println(value); }
+#define PR(msg, value)          { Serial.print(F(msg)); Serial.println(value); }
+#define PR_MSG(msg)             { Serial.print(F(msg)); }
 #else
-#define PR(msg, value)          {}           
+#define PR(msg, value)          {}   
+#define PR_MSG(msg)             { }        
 #endif
 
 #define PR_VALUE(msg, value)    { Serial.print(F(msg)); Serial.println(value); }
@@ -189,8 +191,6 @@ NAVROOT(nav,mainMenu,MAX_DEPTH,in,out);
 Bounce btnBlk = Bounce(BUTTONS_BLK_PIN, 5);
 Bounce btnRed = Bounce(BUTTONS_RED_PIN, 5); 
 
-
-
 void buttonInit() {
   pinMode(BUTTONS_BLK_PIN,  INPUT_PULLUP);
   pinMode(BUTTONS_RED_PIN,  INPUT_PULLUP);
@@ -228,7 +228,7 @@ void buttonProcess() {
 #include <TaskScheduler.h>
 
 void radioProcess();
-Task radioTask(1000, TASK_FOREVER, &radioProcess);
+Task radioTask(500, TASK_FOREVER, &radioProcess);
 Scheduler runner;
 
 float voltageReading12b(uint8_t pin) {
@@ -240,17 +240,19 @@ void txSensor() {
   txAnalogTilt = voltageReading12b(ADC1_3);
   packer.clear();
   packer.serialize(txAnalogPan, txAnalogTilt, BTNBlkValue, BTNRedValue);
+#if DEBUG_VALUE
   PR_FLOAT("\nI:TX:PAN:", txAnalogPan);
   PR_FLOAT("I:TX:TILT:", txAnalogTilt);
   PR("I:TX:BLK:", BTNBlkValue);
   PR("I:TX:RED:", BTNRedValue);
   PR("I:TX:SIZE:", packer.size());
+#endif
   int state = radio.transmit((uint8_t *)packer.data(), packer.size());
 
   if (state == ERR_NONE) {
     // the packet was successfully transmitted
     LED_SHOW_COLOR(TX_LED, CRGB::Green);
-    Serial.println(F("I:Si4432:TX:success!"));
+    PR_MSG("I:Si4432:TX:success!");
 
   } else if (state == ERR_PACKET_TOO_LONG) {
     // the supplied packet was longer than 256 bytes
@@ -278,7 +280,7 @@ void rxTelemetry() {
   if (state == ERR_NONE) {
     // packet was successfully received
     LED_SHOW_COLOR(RX_LED, CRGB::Green);
-    Serial.println(F("\nI:Si4432:RX:success!"));
+    PR_MSG("\nI:Si4432:RX:success!");
     unpacker.feed(payload, PACKET_RX_SIZE);
     unpacker.deserialize(analogA0, analogA1, analogA2, analogA3);
 
@@ -295,7 +297,7 @@ void rxTelemetry() {
     // timeout occurred while waiting for a packet
     // LED_SHOW_COLOR(RX_LED, CRGB::Blue);
     // Serial.println(F("I:Si4432:RX:timeout!"));
-    Serial.print(F("."));
+    // Serial.print(F("."));
 
   } else if (state == ERR_CRC_MISMATCH) {
     // packet was received, but is malformed

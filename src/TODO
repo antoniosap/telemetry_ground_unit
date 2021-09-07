@@ -1,7 +1,7 @@
 TODO
 
+- MQTT
 - leggere pan/tilt 5 volte al secondo
 - completare il led bar status
-- MQTT
 - completare il menu
 - salvataggio su eeprom
