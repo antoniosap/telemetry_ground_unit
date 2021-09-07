@@ -224,6 +224,41 @@ void buttonProcess() {
   }    
 }
 
+//-------------------------------------------------------------------------------------------------------
+#include <WiFi.h>
+#include "FS.h"
+#include "SPIFFS.h"
+#include <DNSServer.h>
+#include <WebServer.h>
+
+//--- MQTT CLIENT ---------------------------------------------------------------------------------------
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+
+#define MQTT_SERVER           "192.168.147.1"
+#define MQTT_MSG_BUFFER_SIZE	(50)
+#define MQTT_TOPIC_GROUND_TX  "ground_tx"
+#define MQTT_TOPIC_GROUND_RX  "ground_rx"
+
+WiFiClient   mqttWifiClient;
+PubSubClient mqttClient(mqttWifiClient);
+char mqttMsg[MQTT_MSG_BUFFER_SIZE + 1];
+StaticJsonDocument<256> doc;
+char mqttRXMsg[MQTT_MSG_BUFFER_SIZE + 1];
+char *mqttRXMsgP = mqttRXMsg;
+int mqttRXSeconds = 0;
+
+// void keyPublish(int8_t key) {
+//   if (key >= 0) {
+//     // MQTT publish
+//     char bts[] = {keymap[key], 0};
+//     doc["key"] = bts;
+//     serializeJson(doc, mqttMsg);
+//     mqttClient.publish(MQTT_TOPIC_KEYBOARD, mqttMsg);
+//     //
+//   }
+// }
+
 //-------------------------------------------------------------------------------
 #include <TaskScheduler.h>
 
