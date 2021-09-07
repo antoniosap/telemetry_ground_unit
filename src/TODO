@@ -1,7 +1,8 @@
 TODO
 
-- MQTT
-- leggere pan/tilt 5 volte al secondo
+- MQTT interface output:
+    pan + tilt + btns + rx packet
+- CI SONO LATENZE TRA TX/RX: RIMANDATO leggere pan/tilt 5 volte al secondo
 - completare il led bar status
 - completare il menu
 - salvataggio su eeprom
