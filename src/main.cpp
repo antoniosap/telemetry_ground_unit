@@ -251,7 +251,6 @@ StaticJsonDocument<256> doc;
 // MQTT client examples:
 // mosquitto_sub -h 192.168.147.1 -t ground_tx
 // -->   {"status":0,"pan":0.809692,"tilt":1.259253,"blk":1,"red":1}
-// mosquitto_sub -h 192.168.147.1 -t ground_rx
 
 void mqttTXPublish(int status) {
   doc["status"] = status;
@@ -259,8 +258,24 @@ void mqttTXPublish(int status) {
   doc["tilt"] = txAnalogTilt;
   doc["blk"] = BTNBlkValue;
   doc["red"] = BTNRedValue;
+  doc["RSSI"] = module->SPIgetRegValue(SI443X_REG_RSSI);
   serializeJson(doc, mqttMsg);
   mqttClient.publish(MQTT_TOPIC_GROUND_TX, mqttMsg);
+}
+
+// MQTT client examples:  
+// mosquitto_sub -h 192.168.147.1 -t ground_rx
+// -->  
+
+void mqttRXPublish(int status) {
+  doc["status"] = status;
+  doc["A0"] = analogA0;
+  doc["A1"] = analogA1;
+  doc["A2"] = analogA2;
+  doc["A3"] = analogA3;
+  // doc["RSSI"] = 0;
+  serializeJson(doc, mqttMsg);
+  mqttClient.publish(MQTT_TOPIC_GROUND_RX, mqttMsg);
 }
 
 // void mqttCallback(char* topic, byte* payload, unsigned int length) {
@@ -396,6 +411,7 @@ void rxTelemetry() {
     Serial.println(state);
 
   }
+  mqttRXPublish(state);
   LED_SHOW_COLOR(RX_LED, CRGB::Black);
 }
 
