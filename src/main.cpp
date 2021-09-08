@@ -230,40 +230,89 @@ void buttonProcess() {
 #include "SPIFFS.h"
 #include <DNSServer.h>
 #include <WebServer.h>
+#include <credentials.h> 
+
+bool wifiConnectedMsg = false;
 
 //--- MQTT CLIENT ---------------------------------------------------------------------------------------
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
 #define MQTT_SERVER           "192.168.147.1"
-#define MQTT_MSG_BUFFER_SIZE	(50)
-#define MQTT_TOPIC_GROUND_TX  "ground_tx"
-#define MQTT_TOPIC_GROUND_RX  "ground_rx"
+#define MQTT_MSG_BUFFER_SIZE	(80)
+#define MQTT_TOPIC_GROUND_TX  "ground_tx"   // publish topic
+#define MQTT_TOPIC_GROUND_RX  "ground_rx"   // publish topic
 
 WiFiClient   mqttWifiClient;
 PubSubClient mqttClient(mqttWifiClient);
 char mqttMsg[MQTT_MSG_BUFFER_SIZE + 1];
 StaticJsonDocument<256> doc;
-char mqttRXMsg[MQTT_MSG_BUFFER_SIZE + 1];
-char *mqttRXMsgP = mqttRXMsg;
-int mqttRXSeconds = 0;
 
-// void keyPublish(int8_t key) {
-//   if (key >= 0) {
-//     // MQTT publish
-//     char bts[] = {keymap[key], 0};
-//     doc["key"] = bts;
-//     serializeJson(doc, mqttMsg);
-//     mqttClient.publish(MQTT_TOPIC_KEYBOARD, mqttMsg);
-//     //
+// MQTT client examples:
+// mosquitto_sub -h 192.168.147.1 -t ground_tx
+// -->   {"status":0,"pan":0.809692,"tilt":1.259253,"blk":1,"red":1}
+// mosquitto_sub -h 192.168.147.1 -t ground_rx
+
+void mqttTXPublish(int status) {
+  doc["status"] = status;
+  doc["pan"] = txAnalogPan;
+  doc["tilt"] = txAnalogTilt;
+  doc["blk"] = BTNBlkValue;
+  doc["red"] = BTNRedValue;
+  serializeJson(doc, mqttMsg);
+  mqttClient.publish(MQTT_TOPIC_GROUND_TX, mqttMsg);
+}
+
+// void mqttCallback(char* topic, byte* payload, unsigned int length) {
+//   Serial.print("I:MQTT:RX:T:");
+//   Serial.print(topic);
+//   Serial.print(":");
+//   if (!strcmp(topic, MQTT_TOPIC_DISPLAY)) {
+//     memcpy(mqttMsg, payload, length < MQTT_MSG_BUFFER_SIZE ? length : MQTT_MSG_BUFFER_SIZE);
+//     *(mqttMsg + length) = 0;
+//     DeserializationError err = deserializeJson(doc, mqttMsg);
+//     if (err == DeserializationError::Ok) {
+//       strcpy(mqttRXMsg, doc["msg"]);
+//       mqttRXSeconds = doc["sec"];
+//       mqttRXMsgP = mqttRXMsg;
+//       Serial.print("I:MQTT:msg:"); Serial.println(mqttRXMsg);
+//       Serial.print("I:MQTT:sec:"); Serial.println(mqttRXSeconds);
+//     } else {
+//       Serial.print("E:JSON:");
+//       Serial.println(err.f_str());
+//     }
 //   }
 // }
+
+void mqttConnect() {
+  if (WiFi.status() == WL_CONNECTED && !mqttClient.connected()) {
+    Serial.println("I:MQTT:connection...");
+    // Create a random client ID
+    String clientId = "ground-unit-";
+    clientId += String(random(0xffff), HEX);
+    // Attempt to connect
+    if (mqttClient.connect(clientId.c_str())) {
+      Serial.println("I:MQTT:connected");
+      // Once connected, publish an announcement...
+      //mqttClient.publish("outTopic", "hello world");
+      // ... and resubscribe
+      // mqttClient.subscribe(MQTT_TOPIC_DISPLAY);
+    } else {
+      Serial.print("E:MQTT:failed, rc=");
+      Serial.println(mqttClient.state());
+    }
+  }
+}
 
 //-------------------------------------------------------------------------------
 #include <TaskScheduler.h>
 
 void radioProcess();
 Task radioTask(500, TASK_FOREVER, &radioProcess);
+void mqttConnect();
+Task mqttTask(5000, TASK_FOREVER, &mqttConnect);
+void wifiConnect();
+Task wifiTask(5000, TASK_FOREVER, &wifiConnect);
 Scheduler runner;
 
 float voltageReading12b(uint8_t pin) {
@@ -305,6 +354,7 @@ void txSensor() {
     Serial.print(F("I:Si4432:TX:failed, code "));
     Serial.println(state);
   }
+  mqttTXPublish(state);
   LED_SHOW_COLOR(TX_LED, CRGB::Black);
 }
 
@@ -356,6 +406,22 @@ void radioProcess() {
 }
 
 //-------------------------------------------------------------------------------------------------------
+
+void wifiConnect() {
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!wifiConnectedMsg) {
+      wifiConnectedMsg = true;
+      Serial.print("I:WIFI:IP:");
+      Serial.println(WiFi.localIP());
+    }
+  } else {
+    wifiConnectedMsg = false;
+    Serial.println("I:WIFI:DISC");
+    Serial.println("I:WIFI:START");
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+  }
+}
+
 
 result menuShowIP() {
   Serial.println("menuShowIP");
@@ -493,9 +559,18 @@ void setup() {
   LED_SHOW_COLOR(TX_LED, CRGB::Black);
   buttonInit();
 
+    // MQTT begin
+  mqttClient.setServer(MQTT_SERVER, 1883);
+  // mqttClient.setCallback(mqttCallback); only mqtt transmit
+  // MQTT end
+
   runner.init();
   runner.addTask(radioTask);
+  runner.addTask(mqttTask);
+  runner.addTask(wifiTask);
   radioTask.enable();
+  mqttTask.enable();
+  wifiTask.enable();
 }
 
 void loop() {
