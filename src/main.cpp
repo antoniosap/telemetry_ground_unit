@@ -206,20 +206,20 @@ void buttonProcess() {
   if (BTNBlkValue != btnBlk.read()) {
     BTNBlkValue = btnBlk.read();
     if (BTNBlkValue == LOW) {
-      PR_VALUE("BTN:BLK:", "LOW");
+      PR_VALUE("\nBTN:BLK:", "LOW");
     }
     if (BTNBlkValue == HIGH) {
-      PR_VALUE("BTN:BLK:", "HIGH");
+      PR_VALUE("\nBTN:BLK:", "HIGH");
     }
   }  
   
   if (BTNRedValue != btnRed.read()) {
     BTNRedValue = btnRed.read();
     if (BTNRedValue == LOW) {
-      PR_VALUE("BTN:RED:", "LOW");
+      PR_VALUE("\nBTN:RED:", "LOW");
     }
     if (BTNRedValue == HIGH) {
-      PR_VALUE("BTN:RED:", "HIGH");
+      PR_VALUE("\nBTN:RED:", "HIGH");
     }
   }    
 }
@@ -250,9 +250,11 @@ StaticJsonDocument<256> doc;
 
 // MQTT client examples:
 // mosquitto_sub -h 192.168.147.1 -t ground_tx
-// -->   {"status":0,"pan":0.809692,"tilt":1.259253,"blk":1,"red":1}
+// -->   {"status":0,"pan":0.809692,"tilt":1.259253,"blk":1,"red":1} 
+// pan / tilt in Volts 0..3V3
 
 void mqttTXPublish(int status) {
+  doc.clear();
   doc["status"] = status;
   doc["pan"] = txAnalogPan;
   doc["tilt"] = txAnalogTilt;
@@ -268,6 +270,7 @@ void mqttTXPublish(int status) {
 // -->  
 
 void mqttRXPublish(int status) {
+  doc.clear();
   doc["status"] = status;
   doc["A0"] = analogA0;
   doc["A1"] = analogA1;
@@ -317,6 +320,130 @@ void mqttConnect() {
       Serial.println(mqttClient.state());
     }
   }
+}
+
+//--- BLE CONSOLE ---------------------------------------------------------------
+/*
+    Video: https://www.youtube.com/watch?v=oCMOYS71NIU
+    Based on Neil Kolban example for IDF: https://github.com/nkolban/esp32-snippets/blob/master/cpp_utils/tests/BLE%20Tests/SampleNotify.cpp
+    Ported to Arduino ESP32 by Evandro Copercini
+
+   Create a BLE server that, once we receive a connection, will send periodic notifications.
+   The service advertises itself as: 6E400001-B5A3-F393-E0A9-E50E24DCCA9E
+   Has a characteristic of: 6E400002-B5A3-F393-E0A9-E50E24DCCA9E - used for receiving data with "WRITE" 
+   Has a characteristic of: 6E400003-B5A3-F393-E0A9-E50E24DCCA9E - used to send data with  "NOTIFY"
+
+   The design of creating the BLE server is:
+   1. Create a BLE Server
+   2. Create a BLE Service
+   3. Create a BLE Characteristic on the Service
+   4. Create a BLE Descriptor on the characteristic
+   5. Start the service.
+   6. Start advertising.
+*/
+#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
+
+BLEServer *pServer = NULL;
+BLECharacteristic *pTxCharacteristic;
+bool deviceConnected = false;
+bool oldDeviceConnected = false;
+
+// See the following for generating UUIDs:
+// https://www.uuidgenerator.net/
+
+#define BLE_DEVICE_NAME        "ground-unit"
+#define SERVICE_UUID           "ed30e0c5-2ed3-4cce-b3ef-2beeca718670" // UART service UUID
+#define CHARACTERISTIC_UUID_RX "a77a0727-584f-41b4-8aaf-735cf50fe746"
+#define CHARACTERISTIC_UUID_TX "2f6e1b6b-128c-4690-858f-12197948474a"
+
+class MyServerCallbacks: public BLEServerCallbacks {
+    void onConnect(BLEServer* pServer) {
+      deviceConnected = true;
+    };
+
+    void onDisconnect(BLEServer* pServer) {
+      deviceConnected = false;
+    }
+};
+
+class MyCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+      std::string rxValue = pCharacteristic->getValue();
+
+      if (rxValue.length() > 0) {
+        Serial.print("I:BLE:");
+        for (int i = 0; i < rxValue.length(); i++)
+          Serial.print(rxValue[i]);
+
+        Serial.println();
+      }
+    }
+};
+
+void bleInit() {
+  // Create the BLE Device
+  BLEDevice::init(BLE_DEVICE_NAME);
+
+  // Create the BLE Server
+  pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new MyServerCallbacks());
+
+  // Create the BLE Service
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+
+  // Create a BLE Characteristic
+  pTxCharacteristic = pService->createCharacteristic(
+                      CHARACTERISTIC_UUID_TX,
+                      BLECharacteristic::PROPERTY_NOTIFY
+                    );
+                      
+  pTxCharacteristic->addDescriptor(new BLE2902());
+
+  BLECharacteristic *pCharacteristic = pService->createCharacteristic(
+                                         CHARACTERISTIC_UUID_RX,
+                                         BLECharacteristic::PROPERTY_READ |
+                                         BLECharacteristic::PROPERTY_WRITE
+                                       );
+
+  pCharacteristic->setCallbacks(new MyCallbacks());
+
+  // Start the service 
+  pTxCharacteristic->setValue("I:BLE:START");
+  pService->start();
+
+  // Start advertising
+  pServer->getAdvertising()->start();
+  Serial.println(F("I:BLE:START"));
+}
+
+void bleProcess() {
+  // disconnecting
+  if (!deviceConnected && oldDeviceConnected) {
+    delay(500); // give the bluetooth stack the chance to get things ready
+    pServer->startAdvertising(); // restart advertising
+    Serial.println("I:BLE:start advertising");
+    oldDeviceConnected = deviceConnected;
+  }
+  // connecting
+  if (deviceConnected && !oldDeviceConnected) {
+    // do stuff here on connecting
+    oldDeviceConnected = deviceConnected;
+  }
+}
+
+//
+// al BLE spedire lo stesso messaggio json inviato in mqtt
+//
+void bleNotify() {
+  if (deviceConnected) {
+    pTxCharacteristic->setValue(mqttMsg);
+    pTxCharacteristic->notify();
+    pTxCharacteristic->setValue("\n");
+    pTxCharacteristic->notify();
+	}
 }
 
 //-------------------------------------------------------------------------------
@@ -370,6 +497,7 @@ void txSensor() {
     Serial.println(state);
   }
   mqttTXPublish(state);
+  bleNotify();
   LED_SHOW_COLOR(TX_LED, CRGB::Black);
 }
 
@@ -411,7 +539,10 @@ void rxTelemetry() {
     Serial.println(state);
 
   }
-  mqttRXPublish(state);
+  if (state != ERR_RX_TIMEOUT) {
+    mqttRXPublish(state);
+    bleNotify();
+  }
   LED_SHOW_COLOR(RX_LED, CRGB::Black);
 }
 
@@ -419,6 +550,7 @@ void radioProcess() {
   buttonProcess();
   txSensor();
   rxTelemetry();
+  bleProcess();
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -575,10 +707,12 @@ void setup() {
   LED_SHOW_COLOR(TX_LED, CRGB::Black);
   buttonInit();
 
-    // MQTT begin
+  // MQTT begin
   mqttClient.setServer(MQTT_SERVER, 1883);
   // mqttClient.setCallback(mqttCallback); only mqtt transmit
   // MQTT end
+
+  bleInit();
 
   runner.init();
   runner.addTask(radioTask);

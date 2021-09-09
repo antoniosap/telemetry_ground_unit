@@ -68,3 +68,10 @@ I:MOSI:23
 I:MISO:19
 I:SCK:18
 I:SS:5
+
+## tools espressIF
+
+https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension
+https://blog.espressif.com/how-to-use-custom-partition-tables-on-esp32-69c0f3fa89c8
+https://docs.platformio.org/en/latest/platforms/espressif32.html#partition-tables
+https://github.com/espressif/arduino-esp32/tree/master/tools/partitions
