@@ -50,8 +50,8 @@ LED 0 RSSI                  0 -> 6
 LED 1 BAT ground base
 LED 2 BAT mobile 1
 LED 3 BAT mobile 2
-LED 4
-LED 5
+LED 4 WIFI connected        BLUE = OFF GREEN = OK
+LED 5 BLE connected         BLUE = OFF GREEN = OK
 LED 6 RX PACKET             GREEN = OK
 LED 7 TX PACKET             GREEN = OK
 

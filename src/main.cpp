@@ -75,6 +75,9 @@ template <typename T> T serialPrintBinary(T x, bool usePrefix = true)
 #define BRIGHTNESS  128
 CRGB leds[NUM_LEDS];
 
+#define RSSI_LED    0
+#define WIFI_LED    4
+#define BLE_LED     5
 #define RX_LED      6
 #define TX_LED      7
 
@@ -267,7 +270,7 @@ void mqttTXPublish(int status) {
 
 // MQTT client examples:  
 // mosquitto_sub -h 192.168.147.1 -t ground_rx
-// -->  
+// -->  {"status":0,"A0":0.596191,"A1":0.770215,"A2":0.754102,"A3":0.563965}
 
 void mqttRXPublish(int status) {
   doc.clear();
@@ -276,7 +279,6 @@ void mqttRXPublish(int status) {
   doc["A1"] = analogA1;
   doc["A2"] = analogA2;
   doc["A3"] = analogA3;
-  // doc["RSSI"] = 0;
   serializeJson(doc, mqttMsg);
   mqttClient.publish(MQTT_TOPIC_GROUND_RX, mqttMsg);
 }
@@ -348,8 +350,8 @@ void mqttConnect() {
 
 BLEServer *pServer = NULL;
 BLECharacteristic *pTxCharacteristic;
-bool deviceConnected = false;
-bool oldDeviceConnected = false;
+bool bleDeviceConnected = false;
+bool bleDeviceConnectedLast = false;
 
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
@@ -361,11 +363,11 @@ bool oldDeviceConnected = false;
 
 class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
-      deviceConnected = true;
+      bleDeviceConnected = true;
     };
 
     void onDisconnect(BLEServer* pServer) {
-      deviceConnected = false;
+      bleDeviceConnected = false;
     }
 };
 
@@ -421,16 +423,16 @@ void bleInit() {
 
 void bleProcess() {
   // disconnecting
-  if (!deviceConnected && oldDeviceConnected) {
+  if (!bleDeviceConnected && bleDeviceConnectedLast) {
     delay(500); // give the bluetooth stack the chance to get things ready
     pServer->startAdvertising(); // restart advertising
     Serial.println("I:BLE:start advertising");
-    oldDeviceConnected = deviceConnected;
+    bleDeviceConnectedLast = bleDeviceConnected;
   }
   // connecting
-  if (deviceConnected && !oldDeviceConnected) {
+  if (bleDeviceConnected && !bleDeviceConnectedLast) {
     // do stuff here on connecting
-    oldDeviceConnected = deviceConnected;
+    bleDeviceConnectedLast = bleDeviceConnected;
   }
 }
 
@@ -438,7 +440,7 @@ void bleProcess() {
 // al BLE spedire lo stesso messaggio json inviato in mqtt
 //
 void bleNotify() {
-  if (deviceConnected) {
+  if (bleDeviceConnected) {
     pTxCharacteristic->setValue(mqttMsg);
     pTxCharacteristic->notify();
     pTxCharacteristic->setValue("\n");
@@ -459,6 +461,35 @@ Scheduler runner;
 
 float voltageReading12b(uint8_t pin) {
   return analogRead(pin) * (3.3 / 4096.0); // @3V3
+}
+
+void connectionIndicator() {
+  if (WiFi.status() == WL_CONNECTED) {
+    LED_SHOW_COLOR(WIFI_LED, CRGB::Green);
+  } else {
+    LED_SHOW_COLOR(WIFI_LED, CRGB::Blue);
+  }
+
+  if (bleDeviceConnected) {
+    LED_SHOW_COLOR(BLE_LED, CRGB::Green);
+  } else {
+    LED_SHOW_COLOR(BLE_LED, CRGB::Blue);
+  }
+}
+
+void RSSIindicator() {
+  uint8_t RSSI = module->SPIgetRegValue(SI443X_REG_RSSI);
+  if (RSSI <= 30) {
+    LED_SHOW_COLOR(RSSI_LED, CRGB::Red);
+  } else if (RSSI > 30 && RSSI <= 40 ) {
+    LED_SHOW_COLOR(RSSI_LED, CRGB::Orange);
+  } else if (RSSI > 40 && RSSI <= 50 ) {
+    LED_SHOW_COLOR(RSSI_LED, CRGB::Yellow);
+  } else if (RSSI > 50 && RSSI <= 100 ) {
+    LED_SHOW_COLOR(RSSI_LED, CRGB::Green);
+  } else if (RSSI > 100 ) {
+    LED_SHOW_COLOR(RSSI_LED, CRGB::White);
+  }
 }
 
 void txSensor() {
@@ -498,6 +529,8 @@ void txSensor() {
   }
   mqttTXPublish(state);
   bleNotify();
+  RSSIindicator();
+  connectionIndicator();
   LED_SHOW_COLOR(TX_LED, CRGB::Black);
 }
 

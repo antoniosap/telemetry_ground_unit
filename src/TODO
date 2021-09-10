@@ -1,8 +1,9 @@
 TODO
 
-- MQTT interface output:
-    pan + tilt + btns + rx packet
+OK MQTT interface output:
+OK     pan + tilt + btns + rx packet
 - CI SONO LATENZE TRA TX/RX: RIMANDATO leggere pan/tilt 5 volte al secondo
-- completare il led bar status
+OK completare il led bar status
+- se non arriva il packet RX dopo un timeout, segnalarlo con l'indicatore RX rosso fisso
 - completare il menu
 - salvataggio su eeprom
