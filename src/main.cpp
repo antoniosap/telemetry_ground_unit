@@ -103,10 +103,15 @@ float radioFreqDev = 50.0;
 float radioRxBw = 181.1;
 int8_t radioPower = 10;
 uint8_t radioPreambleLen = 40;
+uint16_t radioRxErrors = 0;
 
 #define ITU_433_ISM_BAND_LOW      (433.050)
 #define ITU_433_ISM_BAND_HIGH     (434.790)
 #define ITU_433_ISM_BAND_SPACING    (0.025)  
+#define RADIO_MAX_ERRORS          (20)  
+#define RADIO_MSG_LEN             (16)
+
+char radioRxMsg[RADIO_MSG_LEN] = "";
 
 //-- MSG PACK -------------------------------------------------------------------
 // RX PROTOCOL
@@ -242,7 +247,7 @@ bool wifiConnectedMsg = false;
 #include <ArduinoJson.h>
 
 #define MQTT_SERVER           "192.168.147.1"
-#define MQTT_MSG_BUFFER_SIZE	(80)
+#define MQTT_MSG_BUFFER_SIZE	(120)
 #define MQTT_TOPIC_GROUND_TX  "ground_tx"   // publish topic
 #define MQTT_TOPIC_GROUND_RX  "ground_rx"   // publish topic
 
@@ -253,7 +258,7 @@ StaticJsonDocument<256> doc;
 
 // MQTT client examples:
 // mosquitto_sub -h 192.168.147.1 -t ground_tx
-// -->   {"status":0,"pan":0.809692,"tilt":1.259253,"blk":1,"red":1} 
+// -->   {"status":0,"pan":1.599243,"tilt":1.112622,"blk":1,"red":1,"TX_RSSI":46,"msg":"FAULT"}
 // pan / tilt in Volts 0..3V3
 
 void mqttTXPublish(int status) {
@@ -263,7 +268,8 @@ void mqttTXPublish(int status) {
   doc["tilt"] = txAnalogTilt;
   doc["blk"] = BTNBlkValue;
   doc["red"] = BTNRedValue;
-  doc["RSSI"] = module->SPIgetRegValue(SI443X_REG_RSSI);
+  doc["TX_RSSI"] = module->SPIgetRegValue(SI443X_REG_RSSI);
+  doc["msg"] = radioRxMsg;
   serializeJson(doc, mqttMsg);
   mqttClient.publish(MQTT_TOPIC_GROUND_TX, mqttMsg);
 }
@@ -279,6 +285,7 @@ void mqttRXPublish(int status) {
   doc["A1"] = analogA1;
   doc["A2"] = analogA2;
   doc["A3"] = analogA3;
+  doc["RX_RSSI"] = 0;
   serializeJson(doc, mqttMsg);
   mqttClient.publish(MQTT_TOPIC_GROUND_RX, mqttMsg);
 }
@@ -544,6 +551,7 @@ void rxTelemetry() {
     PR_MSG("\nI:Si4432:RX:success!");
     unpacker.feed(payload, PACKET_RX_SIZE);
     unpacker.deserialize(analogA0, analogA1, analogA2, analogA3);
+    radioRxErrors = 0;
 
     // print the data of the packet
     // Serial.print(F("I:Si4432:RX:Data:"));
@@ -559,24 +567,34 @@ void rxTelemetry() {
     // LED_SHOW_COLOR(RX_LED, CRGB::Blue);
     // Serial.println(F("I:Si4432:RX:timeout!"));
     // Serial.print(F("."));
+    radioRxErrors++;
 
   } else if (state == ERR_CRC_MISMATCH) {
     // packet was received, but is malformed
     LED_SHOW_COLOR(RX_LED, CRGB::Violet);
     Serial.println(F("\nI:Si4432:RX:CRC error!"));
+    radioRxErrors++;
 
   } else {
     // some other error occurred
     LED_SHOW_COLOR(RX_LED, CRGB::Red);
     Serial.print(F("\nI:Si4432:RX:failed code: "));
     Serial.println(state);
+    radioRxErrors++;
 
   }
   if (state != ERR_RX_TIMEOUT) {
     mqttRXPublish(state);
     bleNotify();
   }
-  LED_SHOW_COLOR(RX_LED, CRGB::Black);
+  if (radioRxErrors > 65000) radioRxErrors = 65000;
+  if (radioRxErrors > RADIO_MAX_ERRORS) {
+    strcpy(radioRxMsg, "FAULT");
+    LED_SHOW_COLOR(RX_LED, CRGB::Red);
+  } else {
+    strcpy(radioRxMsg, "");
+    LED_SHOW_COLOR(RX_LED, CRGB::Black);
+  }
 }
 
 void radioProcess() {
