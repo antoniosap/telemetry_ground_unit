@@ -6,6 +6,6 @@ OK     pan + tilt + btns + rx packet
 OK completare il led bar status
 OK se non arriva il packet RX dopo un timeout, segnalarlo con l'indicatore RX rosso fisso
 - RSSI remoto
-- perdita segnale su status mqtt + ble
+OK perdita segnale su status mqtt + ble
 - completare il menu
 - salvataggio su eeprom
