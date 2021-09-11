@@ -119,7 +119,8 @@ float analogA0;
 float analogA1;
 float analogA2;
 float analogA3;
-#define PACKET_RX_SIZE (20)    // matched bit-bit @ packer.size() transmitter 
+uint8_t rxRSSI;
+#define PACKET_RX_SIZE (21)    // matched bit-bit @ packer.size() transmitter 
 // TX PROTOCOL
 float txAnalogPan;
 float txAnalogTilt;
@@ -285,7 +286,7 @@ void mqttRXPublish(int status) {
   doc["A1"] = analogA1;
   doc["A2"] = analogA2;
   doc["A3"] = analogA3;
-  doc["RX_RSSI"] = 0;
+  doc["RX_RSSI"] = rxRSSI;
   serializeJson(doc, mqttMsg);
   mqttClient.publish(MQTT_TOPIC_GROUND_RX, mqttMsg);
 }
@@ -550,7 +551,7 @@ void rxTelemetry() {
     LED_SHOW_COLOR(RX_LED, CRGB::Green);
     PR_MSG("\nI:Si4432:RX:success!");
     unpacker.feed(payload, PACKET_RX_SIZE);
-    unpacker.deserialize(analogA0, analogA1, analogA2, analogA3);
+    unpacker.deserialize(analogA0, analogA1, analogA2, analogA3, rxRSSI);
     radioRxErrors = 0;
 
     // print the data of the packet
@@ -561,6 +562,7 @@ void rxTelemetry() {
     PR_FLOAT("I:RX:A1:", analogA1);
     PR_FLOAT("I:RX:A2:", analogA2);
     PR_FLOAT("I:RX:A3:", analogA3);
+    PR("I:RX:RSSI:", rxRSSI);
 #endif
   } else if (state == ERR_RX_TIMEOUT) {
     // timeout occurred while waiting for a packet
