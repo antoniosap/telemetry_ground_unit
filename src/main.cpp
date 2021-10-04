@@ -5,7 +5,7 @@
 
 //-- DEBUG ----------------------------------------------------------------------
 #define DEBUG_PIN               false
-#define DEBUG_VALUE             false
+#define DEBUG_VALUE             true
 
 #if DEBUG_PIN
 #define TEST_PIN(gpio_nr)          { Serial.print("TEST_PIN BEGIN:"); \
@@ -115,10 +115,10 @@ char radioRxMsg[RADIO_MSG_LEN] = "";
 
 //-- MSG PACK -------------------------------------------------------------------
 // RX PROTOCOL
-float analogA0;
-float analogA1;
-float analogA2;
-float analogA3;
+float currACS712nr1;
+float currACS712nr2;
+float tcLM35;
+float voltageA3;
 uint8_t rxRSSI;
 #define PACKET_RX_SIZE (21)    // matched bit-bit @ packer.size() transmitter 
 // TX PROTOCOL
@@ -277,15 +277,15 @@ void mqttTXPublish(int status) {
 
 // MQTT client examples:  
 // mosquitto_sub -h 192.168.147.1 -t ground_rx
-// -->  {"status":0,"A0":0.596191,"A1":0.770215,"A2":0.754102,"A3":0.563965}
+// -->  {"status":0,"I1":0.596191,"I2":0.770215,"TC":0.754102,"V3":0.563965}
 
 void mqttRXPublish(int status) {
   doc.clear();
   doc["status"] = status;
-  doc["A0"] = analogA0;
-  doc["A1"] = analogA1;
-  doc["A2"] = analogA2;
-  doc["A3"] = analogA3;
+  doc["I1"] = currACS712nr1;
+  doc["I2"] = currACS712nr2;
+  doc["TC"] = tcLM35;
+  doc["V3"] = voltageA3;
   doc["RX_RSSI"] = rxRSSI;
   serializeJson(doc, mqttMsg);
   mqttClient.publish(MQTT_TOPIC_GROUND_RX, mqttMsg);
@@ -551,17 +551,17 @@ void rxTelemetry() {
     LED_SHOW_COLOR(RX_LED, CRGB::Green);
     PR_MSG("\nI:Si4432:RX:success!");
     unpacker.feed(payload, PACKET_RX_SIZE);
-    unpacker.deserialize(analogA0, analogA1, analogA2, analogA3, rxRSSI);
+    unpacker.deserialize(currACS712nr1, currACS712nr2, tcLM35, voltageA3, rxRSSI);
     radioRxErrors = 0;
 
     // print the data of the packet
     // Serial.print(F("I:Si4432:RX:Data:"));
     // Serial.println((char*)payload);
 #if DEBUG_VALUE
-    PR_FLOAT("I:RX:A0:", analogA0);
-    PR_FLOAT("I:RX:A1:", analogA1);
-    PR_FLOAT("I:RX:A2:", analogA2);
-    PR_FLOAT("I:RX:A3:", analogA3);
+    PR_FLOAT("\nI:RX:I1:", currACS712nr1);
+    PR_FLOAT("I:RX:I2:", currACS712nr2);
+    PR_FLOAT("I:RX:TC:", tcLM35);
+    PR_FLOAT("I:RX:V3:", voltageA3);
     PR("I:RX:RSSI:", rxRSSI);
 #endif
   } else if (state == ERR_RX_TIMEOUT) {
@@ -652,7 +652,7 @@ result menuSave() {
 result menuInfo() {
   Serial.println("\nI:CONSOLE");
   Serial.println("I:Use keys [+ up] [- down] [* enter] [/ esc]");
-  Serial.println("I:to control the menu navigation");
+  Serial.println("I:to control the navigation");
   return proceed;
 }
 
