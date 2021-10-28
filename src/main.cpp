@@ -277,7 +277,7 @@ void mqttTXPublish(int status) {
 
 // MQTT client examples:  
 // mosquitto_sub -h 192.168.147.1 -t ground_rx
-// -->  {"status":0,"I1":0.596191,"I2":0.770215,"TC":0.754102,"V3":0.563965}
+// -->  {"status":0,"I1":0.596191,"I2":0.770215,"TC":0.754102,"V3":0.563965,"RX_RSSI":46}
 
 void mqttRXPublish(int status) {
   doc.clear();
